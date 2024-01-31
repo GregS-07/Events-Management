@@ -22,6 +22,16 @@ cursor.execute('''
     )
 ''')
 
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        date DATE NOT NULL,
+        start TIME NOT NULL,
+        end TIME NOT NULL
+    )
+''')
+
 conn.commit()
 cursor.close()
 conn.close()
@@ -39,10 +49,23 @@ def getStudents():
         result = cursor.fetchall()
     return result
 
+def getEvents():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM events")
+        result = cursor.fetchall()
+    return result
+
 def addStaff(name, department):
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT INTO staff (name, department) VALUES (?, ?)", (name, department))
+        conn.commit()
+
+def addEvent(name, date, start, end):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO events (name, date, start, end) VALUES (?, ?, ?, ?)", (name, date, start, end))
         conn.commit()
 
 def getStaff():
@@ -93,13 +116,25 @@ staffLayout = [
     [sg.Table(values=getStaff(), headings=["Table ID", "Name", "Department", "Hours Worked"], justification = "left", auto_size_columns = True, key="-STAFF_TABLE-")]
 ]
 
+eventsLayout = [
+    [sg.Text("Events Database", font=("Helvetica", 14, "underline"))],
+    [sg.Frame("Add Event", [
+        [sg.Text("Name"), sg.Input(key="-EVENT_NAME-")],
+        [sg.Text("Date"), sg.Input(key="-EVENT_DATE-"), sg.CalendarButton("Pick Date", target="-EVENT_DATE-", format="%d/%m/%Y")],
+        [sg.Text("Starting Time (HH:MM)"), sg.Input(key="-EVENT_START-")],
+        [sg.Text("End Time"), sg.Input(key="-EVENT_END-")],
+        [sg.Button("Add", key="-EVENT_ADD-")],
+    ])],
+    [sg.Table(values=getEvents(), headings=["Table ID", "Name", "Date", "Start", "End"], justification = "left", auto_size_columns = True, key="-EVENTS_TABLE-")]
+
+]
 
 layout = [
     [
         sg.TabGroup([
             [sg.Tab("Students", studentsLayout)],
             [sg.Tab("Staff", staffLayout)],
-            [sg.Tab("Events", [[sg.Text("Events Database")]])],  
+            [sg.Tab("Events", eventsLayout)],  
         ])
     ]
 ]
@@ -109,6 +144,7 @@ window = sg.Window("Application", layout)
 def refreshWindow():
     window['-STAFF_TABLE-'].update(values=getStaff())
     window['-STUDENTS_TABLE-'].update(values=getStudents())
+    window['-EVENTS_TABLE-'].update(values=getEvents())
 
 while True:
     event, values = window.read()
@@ -122,6 +158,10 @@ while True:
 
     if event == "-STAFF_ADD-":
         addStaff(values["-STAFF_NAME-"], values["-STAFF_DEPARTMENT-"])
+        refreshWindow()
+
+    if event == "-EVENT_ADD-":
+        addEvent(values["-EVENT_NAME-"], values["-EVENT_DATE-"], values["-EVENT_START-"], values["-EVENT_END-"])
         refreshWindow()
 
     if event == "-DELETE_STUDENT-":
