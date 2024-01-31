@@ -25,10 +25,10 @@ cursor.execute('''
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        date DATE NOT NULL,
-        start TIME NOT NULL,
-        end TIME NOT NULL
+        name TEXT UNIQUE NOT NULL,
+        date TEXT NOT NULL CHECK (date LIKE '__-__-____'),
+        start TEXT NOT NULL CHECK (start LIKE '__:__'),
+        end TEXT NOT NULL CHECK (end LIKE '__:__')
     )
 ''')
 
@@ -38,9 +38,12 @@ conn.close()
 
 def addStudent(name, course):
     with sqlite3.connect("database.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO students (name, course) VALUES (?, ?)", (name, course))
-        conn.commit()
+        if name and course:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO students (name, course) VALUES (?, ?)", (name, course))
+            conn.commit()
+        else:
+            sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def getStudents():
     with sqlite3.connect("database.db") as conn:
@@ -57,16 +60,25 @@ def getEvents():
     return result
 
 def addStaff(name, department):
-    with sqlite3.connect("database.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO staff (name, department) VALUES (?, ?)", (name, department))
-        conn.commit()
+    if name and department:
+        with sqlite3.connect("database.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO staff (name, department) VALUES (?, ?)", (name, department))
+            conn.commit()
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def addEvent(name, date, start, end):
-    with sqlite3.connect("database.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO events (name, date, start, end) VALUES (?, ?, ?, ?)", (name, date, start, end))
-        conn.commit()
+    if name and date and start and end:
+        with sqlite3.connect("database.db") as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO events (name, date, start, end) VALUES (?, ?, ?, ?)", (name, date, start, end))
+                conn.commit()
+            except:
+                sg.popup("Make sure all inputs follow the correct formats.", title="Format")
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def getStaff():
     with sqlite3.connect("database.db") as conn:
@@ -76,16 +88,46 @@ def getStaff():
     return result
 
 def removeStaff(name):
-    with sqlite3.connect("database.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM staff WHERE name = ?", (name,))
-        conn.commit()
+    if name:
+        with sqlite3.connect("database.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM staff WHERE name = ?", (name,))
+            conn.commit()
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def removeStudent(name):
+    if name:
+        with sqlite3.connect("database.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM students WHERE name = ?", (name,))
+            conn.commit()
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
+
+def removeEvent(name):
+    if name:
+        with sqlite3.connect("database.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM events WHERE name = ?", (name,))
+            conn.commit()
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
+
+def getOptions():
+    options = []
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM students WHERE name = ?", (name,))
-        conn.commit()
+        cursor.execute("SELECT name FROM students")
+        options.append([item[0] for item in cursor.fetchall()])
+
+        cursor.execute("SELECT name FROM staff")
+        options.append([item[0] for item in cursor.fetchall()])
+
+        cursor.execute("SELECT name FROM events")
+        options.append([item[0] for item in cursor.fetchall()])
+
+    return options
 
 studentsLayout = [
     [sg.Text("Students Database", font=("Helvetica", 14, "underline"))],
@@ -120,13 +162,27 @@ eventsLayout = [
     [sg.Text("Events Database", font=("Helvetica", 14, "underline"))],
     [sg.Frame("Add Event", [
         [sg.Text("Name"), sg.Input(key="-EVENT_NAME-")],
-        [sg.Text("Date"), sg.Input(key="-EVENT_DATE-"), sg.CalendarButton("Pick Date", target="-EVENT_DATE-", format="%d/%m/%Y")],
+        [sg.Text("Date"), sg.Input(key="-EVENT_DATE-"), sg.CalendarButton("Pick Date", target="-EVENT_DATE-", format="%d-%m-%Y")],
         [sg.Text("Starting Time (HH:MM)"), sg.Input(key="-EVENT_START-")],
-        [sg.Text("End Time"), sg.Input(key="-EVENT_END-")],
+        [sg.Text("End Time (HH:MM)"), sg.Input(key="-EVENT_END-")],
         [sg.Button("Add", key="-EVENT_ADD-")],
+    ])],
+    [sg.Frame("Remove Event", [
+        [sg.Text("Name"), sg.Input(key="-DELETE_EVENT_NAME-")],
+        [sg.Button("Delete", key="-DELETE_EVENT-")],
     ])],
     [sg.Table(values=getEvents(), headings=["Table ID", "Name", "Date", "Start", "End"], justification = "left", auto_size_columns = True, key="-EVENTS_TABLE-")]
 
+]
+
+assignLayout = [
+    [sg.Text("Assign Event", font=("Helvetica", 14, "underline"))],
+    [sg.Text("Type & Name"), sg.Combo(["Staff", "Student"], key="-ASSIGN_TYPE-", enable_events=True, readonly=True)],
+    [sg.Combo(getOptions()[0], key="-ASSIGN_STUDENT-")],
+    [sg.Combo(getOptions()[1], key="-ASSIGN_STAFF-")],
+    [sg.Text("Event"), sg.Combo(getOptions()[2], key="-ASSIGN_EVENT-")],
+    [sg.Text("Hours (HH:MM)"), sg.Text(key="-ASSIGN_HOURS-")],
+    
 ]
 
 layout = [
@@ -135,6 +191,7 @@ layout = [
             [sg.Tab("Students", studentsLayout)],
             [sg.Tab("Staff", staffLayout)],
             [sg.Tab("Events", eventsLayout)],  
+            [sg.Tab("Assign", assignLayout)]
         ])
     ]
 ]
@@ -171,5 +228,19 @@ while True:
     if event == "-DELETE_STAFF-":
         removeStaff(values["-DELETE_STAFF_NAME-"])
         refreshWindow()
+
+    if event == "-DELETE_EVENT-":
+        removeEvent(values["-DELETE_EVENT_NAME-"])
+        refreshWindow()
+
+    if event == "-ASSIGN_TYPE-":
+        match values["-ASSIGN_TYPE-"]:
+            case "Student":
+                window["-ASSIGN_STUDENT-"].update(visible=True)
+                window["-ASSIGN_STAFF-"].update(visible=False)
+            case "Staff":
+                window["-ASSIGN_STUDENT-"].update(visible=False)
+                window["-ASSIGN_STAFF-"].update(visible=True)
+
 
 window.close()
