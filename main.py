@@ -32,6 +32,16 @@ cursor.execute('''
     )
 ''')
 
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS assignedEvents (
+        id INTEGER PRIMARY KEY,
+        eventName TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        hours TEXT NOT NULL CHECK (hours LIKE '__:__')
+    )
+''')
+
 conn.commit()
 cursor.close()
 conn.close()
@@ -79,6 +89,14 @@ def addEvent(name, date, start, end):
                 sg.popup("Make sure all inputs follow the correct formats.", title="Format")
     else:
         sg.popup("Make sure all fields are filled in.", title="Empty Field")
+
+def assign(type, person, event, hours):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO assignedEvents (eventName, name, type, hours) VALUES (?, ?, ?, ?)", (event, person, type, hours))
+        conn.commit()
+
+
 
 def getStaff():
     with sqlite3.connect("database.db") as conn:
@@ -177,11 +195,14 @@ eventsLayout = [
 
 assignLayout = [
     [sg.Text("Assign Event", font=("Helvetica", 14, "underline"))],
-    [sg.Text("Type & Name"), sg.Combo(["Staff", "Student"], key="-ASSIGN_TYPE-", enable_events=True, readonly=True)],
-    [sg.Combo(getOptions()[0], key="-ASSIGN_STUDENT-")],
-    [sg.Combo(getOptions()[1], key="-ASSIGN_STAFF-")],
-    [sg.Text("Event"), sg.Combo(getOptions()[2], key="-ASSIGN_EVENT-")],
-    [sg.Text("Hours (HH:MM)"), sg.Text(key="-ASSIGN_HOURS-")],
+    [sg.Frame("Assign", [
+        [sg.Text("Type & Name"), sg.Combo(["Staff", "Student"], key="-ASSIGN_TYPE-", enable_events=True, readonly=True)],
+        [sg.Combo(["Pick a type"], key="-ASSIGN_PERSON-")],
+        [sg.Text("Event"), sg.Combo(getOptions()[2], key="-ASSIGN_EVENT-")],
+        [sg.Text("Hours (HH:MM)"), sg.Input(key="-ASSIGN_HOURS-")],
+        [sg.Button("Assign", key="-ASSIGN-")],
+    ])],
+
     
 ]
 
@@ -236,11 +257,12 @@ while True:
     if event == "-ASSIGN_TYPE-":
         match values["-ASSIGN_TYPE-"]:
             case "Student":
-                window["-ASSIGN_STUDENT-"].update(visible=True)
-                window["-ASSIGN_STAFF-"].update(visible=False)
+                window["-ASSIGN_PERSON-"].update(values=getOptions()[0])
             case "Staff":
-                window["-ASSIGN_STUDENT-"].update(visible=False)
-                window["-ASSIGN_STAFF-"].update(visible=True)
+                window["-ASSIGN_PERSON-"].update(values=getOptions()[1])
+
+    if event == "-ASSIGN-":
+        assign(values["-ASSIGN_TYPE-"], values["-ASSIGN_PERSON-"], values["-ASSIGN_EVENT-"], values["-ASSIGN_HOURS-"])
 
 
 window.close()
