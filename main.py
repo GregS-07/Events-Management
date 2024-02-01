@@ -74,6 +74,16 @@ def getEvents():
         result = cursor.fetchall()
     return result
 
+def getDepartments():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT department, SUM(hours) AS total_hours
+                    FROM staff
+                    GROUP BY department;
+        """)
+        result = cursor.fetchall()
+    return result
+
 def addStaff(name, department):
     if name and department:
         with sqlite3.connect("database.db") as conn:
@@ -207,7 +217,9 @@ staffLayout = [
         [sg.Text("Staff"), sg.Input(key="-DELETE_STAFF_NAME-")],
         [sg.Button("Remove", key="-DELETE_STAFF-")],
     ])],
-
+    [sg.Frame("Departments", [
+        [sg.Table(values = getDepartments(), headings=["Department", "Hours"], justification = "left", auto_size_columns = True, key="-DEPARTMENT_TABLE-")]
+    ])]
 ]
 
 eventsLayout = [
@@ -293,7 +305,7 @@ def unassignS(name, event):
         with sqlite3.connect("database.db") as conn:
             try:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM assignedEvents WHERE name = ? AND event = ?", (name, event))
+                cursor.execute("DELETE FROM assignedEvents WHERE name = ? AND eventName = ?", (name, event))
                 conn.commit()
             except: 
                 sg.popup("Make sure the fields are valid", title="Invalid Input")
@@ -303,13 +315,14 @@ def unassignS(name, event):
 updateHours()
 
 def refreshWindow():
+    updateHours()
     window['-STAFF_TABLE-'].update(values=getStaff())
     window['-STUDENTS_TABLE-'].update(values=getStudents())
     window['-EVENTS_TABLE-'].update(values=getEvents())
     window['-ASSIGN_TABLE-'].update(values=getAssignedHours())
     window["-ASSIGN_EVENT-"].update(values=getOptions()[2])
     window["-UNASSIGN_EVENT_S-"].update(values=getOptions()[2])
-    updateHours()
+    window["-DEPARTMENT_TABLE-"].update(values=getDepartments())
 
 while True:
     event, values = window.read()
