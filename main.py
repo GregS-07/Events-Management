@@ -1,5 +1,6 @@
 import PySimpleGUI as sg
 import sqlite3
+import re
 
 conn = sqlite3.connect("database.db")
 cursor = conn.cursor()
@@ -16,7 +17,7 @@ cursor.execute('''
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS staff (
         id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
+        name TEXT UNIQUE NOT NULL,
         department TEXT NOT NULL,
         hours INTEGER DEFAULT 0
     )
@@ -46,6 +47,10 @@ conn.commit()
 cursor.close()
 conn.close()
 
+def isTimeFormat(time_string):
+    time_regex = r'^[0-2][0-9]:[0-5][0-9]$'
+    return bool(re.match(time_regex, time_string))
+
 def addStudent(name, course):
     with sqlite3.connect("database.db") as conn:
         if name and course:
@@ -72,30 +77,38 @@ def getEvents():
 def addStaff(name, department):
     if name and department:
         with sqlite3.connect("database.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO staff (name, department) VALUES (?, ?)", (name, department))
-            conn.commit()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO staff (name, department) VALUES (?, ?)", (name, department))
+                conn.commit()
+            except:
+                sg.popup("Make sure you aren't attempting to enter a duplicate value", title="Invalid Input")
     else:
         sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def addEvent(name, date, start, end):
     if name and date and start and end:
         with sqlite3.connect("database.db") as conn:
-            try:
+            if isTimeFormat(start) and isTimeFormat(end):
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO events (name, date, start, end) VALUES (?, ?, ?, ?)", (name, date, start, end))
                 conn.commit()
-            except:
+            else:
                 sg.popup("Make sure all inputs follow the correct formats.", title="Format")
     else:
         sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
 def assign(type, person, event, hours):
-    with sqlite3.connect("database.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO assignedEvents (eventName, name, type, hours) VALUES (?, ?, ?, ?)", (event, person, type, hours))
-        conn.commit()
-
+    if type and person and event and hours:
+        with sqlite3.connect("database.db") as conn:
+            if isTimeFormat(hours):
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO assignedEvents (eventName, name, type, hours) VALUES (?, ?, ?, ?)", (event, person, type, hours))
+                conn.commit()
+            else:
+                sg.popup("Make sure you follow all the format requirements")
+    else:
+        sg.popup("Make sure all fields are filled in", title="Empty Fields")
 
 
 def getStaff():
@@ -132,6 +145,15 @@ def removeEvent(name):
     else:
         sg.popup("Make sure all fields are filled in.", title="Empty Field")
 
+def unassign(name):
+    if name:
+        with sqlite3.connect("database.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM assignedEvents WHERE name = ?", (name,))
+            conn.commit()
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
+ 
 def getOptions():
     options = []
     with sqlite3.connect("database.db") as conn:
@@ -147,6 +169,17 @@ def getOptions():
 
     return options
 
+def getAssignedHours():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT *
+            FROM assignedEvents
+            ORDER BY eventName
+        ''')
+    
+    return cursor.fetchall()
+
 studentsLayout = [
     [sg.Text("Students Database", font=("Helvetica", 14, "underline"))],
     [sg.Frame("Add Student", [
@@ -154,11 +187,11 @@ studentsLayout = [
         [sg.Text("Course"), sg.Input(key="-STUDENT_COURSE-")],
         [sg.Button("Add", key="-STUDENT_ADD-")],
     ])],
+    [sg.Table(values=getStudents(), headings=["Table ID", "Name", "Course", "Hours Worked"], justification="left", auto_size_columns=True, key="-STUDENTS_TABLE-", col_widths=[10, 50, 50, 20])],
     [sg.Frame("Delete Student", [
         [sg.Text("Student"), sg.Input(key="-DELETE_STUDENT_NAME-")],
         [sg.Button("Delete", key="-DELETE_STUDENT-")],
     ])],
-    [sg.Table(values=getStudents(), headings=["Table ID", "Name", "Course", "Hours Worked"], justification="left", auto_size_columns=True, key="-STUDENTS_TABLE-")],
 ]
 
 
@@ -169,11 +202,12 @@ staffLayout = [
         [sg.Text("Department"), sg.Input(key="-STAFF_DEPARTMENT-")],
         [sg.Button("Add", key="-STAFF_ADD-")],
     ])],
+    [sg.Table(values=getStaff(), headings=["Table ID", "Name", "Department", "Hours Worked"], justification = "left", auto_size_columns = True, key="-STAFF_TABLE-", col_widths=[10, 200, 50, 20])],
     [sg.Frame("Remove Staff", [
         [sg.Text("Staff"), sg.Input(key="-DELETE_STAFF_NAME-")],
         [sg.Button("Remove", key="-DELETE_STAFF-")],
     ])],
-    [sg.Table(values=getStaff(), headings=["Table ID", "Name", "Department", "Hours Worked"], justification = "left", auto_size_columns = True, key="-STAFF_TABLE-")]
+
 ]
 
 eventsLayout = [
@@ -185,11 +219,12 @@ eventsLayout = [
         [sg.Text("End Time (HH:MM)"), sg.Input(key="-EVENT_END-")],
         [sg.Button("Add", key="-EVENT_ADD-")],
     ])],
+    [sg.Table(values=getEvents(), headings=["Table ID", "Name", "Date", "Start", "End"], justification = "left", auto_size_columns = True, key="-EVENTS_TABLE-", col_widths=[10, 200, 20, 20, 20])],
     [sg.Frame("Remove Event", [
         [sg.Text("Name"), sg.Input(key="-DELETE_EVENT_NAME-")],
         [sg.Button("Delete", key="-DELETE_EVENT-")],
     ])],
-    [sg.Table(values=getEvents(), headings=["Table ID", "Name", "Date", "Start", "End"], justification = "left", auto_size_columns = True, key="-EVENTS_TABLE-")]
+
 
 ]
 
@@ -202,8 +237,18 @@ assignLayout = [
         [sg.Text("Hours (HH:MM)"), sg.Input(key="-ASSIGN_HOURS-")],
         [sg.Button("Assign", key="-ASSIGN-")],
     ])],
-
-    
+    [sg.Frame("Assigned Hours", [
+        [sg.Table(values = getAssignedHours(), headings=["Table ID", "Event", "Person", "Type", "Hours"], key="-ASSIGN_TABLE-", auto_size_columns = True, justification="left", col_widths=[10, 50, 50, 20, 20])]
+    ])],
+    [sg.Frame("Unassign All", [
+        [sg.Text("Name"), sg.Input(key="-UNASSIGN_NAME-")],
+        [sg.Button("Unassign", key="-UNASSIGN-")]
+    ])],
+    [sg.Frame("Unassign Specific", [
+        [sg.Text("Name"), sg.Input(key="-UNASSIGN_NAME_S-")],
+        [sg.Text("Event"), sg.Combo(values=getOptions()[2], key="-UNASSIGN_EVENT_S-")],
+        [sg.Button("Unassign", key="-UNASSIGN_S-")]
+    ])],
 ]
 
 layout = [
@@ -217,12 +262,54 @@ layout = [
     ]
 ]
 
-window = sg.Window("Application", layout)
+def createWindow():
+    return sg.Window("Application", layout)
+
+window = createWindow()
+
+def updateHours():
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT name, SUM(CAST(SUBSTR(hours, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(hours, 4, 2) AS INTEGER)) AS total_minutes
+            FROM assignedEvents
+            GROUP BY name
+        ''')
+
+        results = cursor.fetchall()
+
+        for person, total_minutes in results:
+            total_hours = f'{total_minutes // 60:02d}:{total_minutes % 60:02d}'
+
+            cursor.execute("UPDATE students SET hours = ? WHERE name = ?", (total_hours, person))
+
+            cursor.execute("UPDATE staff SET hours = ? WHERE name = ?", (total_hours, person))
+
+        conn.commit()
+
+def unassignS(name, event):
+    if name and event:
+        with sqlite3.connect("database.db") as conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM assignedEvents WHERE name = ? AND event = ?", (name, event))
+                conn.commit()
+            except: 
+                sg.popup("Make sure the fields are valid", title="Invalid Input")
+    else:
+        sg.popup("Make sure all fields are filled in.", title="Empty Field")
+    
+updateHours()
 
 def refreshWindow():
     window['-STAFF_TABLE-'].update(values=getStaff())
     window['-STUDENTS_TABLE-'].update(values=getStudents())
     window['-EVENTS_TABLE-'].update(values=getEvents())
+    window['-ASSIGN_TABLE-'].update(values=getAssignedHours())
+    window["-ASSIGN_EVENT-"].update(values=getOptions()[2])
+    window["-UNASSIGN_EVENT_S-"].update(values=getOptions()[2])
+    updateHours()
 
 while True:
     event, values = window.read()
@@ -260,9 +347,18 @@ while True:
                 window["-ASSIGN_PERSON-"].update(values=getOptions()[0])
             case "Staff":
                 window["-ASSIGN_PERSON-"].update(values=getOptions()[1])
+        refreshWindow()
 
     if event == "-ASSIGN-":
         assign(values["-ASSIGN_TYPE-"], values["-ASSIGN_PERSON-"], values["-ASSIGN_EVENT-"], values["-ASSIGN_HOURS-"])
+        refreshWindow()
 
+    if event == "-UNASSIGN-":
+        unassign(values["-UNASSIGN_NAME-"])
+        refreshWindow()
+
+    if event == "-UNASSIGN_S-":
+        unassignS(values["-UNASSIGN_NAME_S-"], values["-UNASSIGN_EVENT_S-"])
+        refreshWindow()
 
 window.close()
