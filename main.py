@@ -120,7 +120,6 @@ def assign(type, person, event, hours):
     else:
         sg.popup("Make sure all fields are filled in", title="Empty Fields")
 
-
 def getStaff():
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
@@ -161,6 +160,7 @@ def unassign(name):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM assignedEvents WHERE name = ?", (name,))
             conn.commit()
+            refreshWindow()
     else:
         sg.popup("Make sure all fields are filled in.", title="Empty Field")
  
@@ -280,9 +280,42 @@ def createWindow():
 window = createWindow()
 
 def updateHours():
+    # with sqlite3.connect("database.db") as conn:
+    #     cursor = conn.cursor()
+
+    #     print("before updating")
+    #     for row in getStaff():
+            
+    #         print(row)
+
+    #     cursor.execute('''
+    #         SELECT name, SUM(CAST(SUBSTR(hours, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(hours, 4, 2) AS INTEGER)) AS total_minutes
+    #         FROM assignedEvents
+    #         GROUP BY name
+    #     ''')
+
+    #     results = cursor.fetchall()
+
+    #     for person, total_minutes in results:
+    #         total_hours = f'{total_minutes // 60:02d}:{total_minutes % 60:02d}'
+
+    #         cursor.execute("UPDATE students SET hours = ? WHERE name = ?", (total_hours, person))
+
+    #         cursor.execute("UPDATE staff SET hours = ? WHERE name = ?", (total_hours, person))
+
+    #     conn.commit()
+
+    #     print("after updating")
+    #     for row in getStaff():
+    #         print(row)
+
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
 
+        print("before updating")
+        for row in getStaff():
+            print(row)
+        
         cursor.execute('''
             SELECT name, SUM(CAST(SUBSTR(hours, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(hours, 4, 2) AS INTEGER)) AS total_minutes
             FROM assignedEvents
@@ -299,6 +332,10 @@ def updateHours():
             cursor.execute("UPDATE staff SET hours = ? WHERE name = ?", (total_hours, person))
 
         conn.commit()
+    
+        print("after updating")
+        for row in getStaff():
+            print(row)
 
 def unassignS(name, event):
     if name and event:
@@ -307,6 +344,7 @@ def unassignS(name, event):
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM assignedEvents WHERE name = ? AND eventName = ?", (name, event))
                 conn.commit()
+                refreshWindow()
             except: 
                 sg.popup("Make sure the fields are valid", title="Invalid Input")
     else:
@@ -368,10 +406,10 @@ while True:
 
     if event == "-UNASSIGN-":
         unassign(values["-UNASSIGN_NAME-"])
-        refreshWindow()
+
 
     if event == "-UNASSIGN_S-":
         unassignS(values["-UNASSIGN_NAME_S-"], values["-UNASSIGN_EVENT_S-"])
-        refreshWindow()
+
 
 window.close()
