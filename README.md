@@ -9,3 +9,9 @@ There are different tabs with their own tables in the database. Staff, students 
 
 ### Purpose
 A software to assign and track people/department hours in College events was discussed in a meeting and then the IT students were asked to create a sort of prototype and for it to be submitted. 
+
+#### Libraries/Languages
+- Python
+- SQL
+- PySimpleGui
+- SQLite
