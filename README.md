@@ -1,8 +1,6 @@
 ### How to run
-In order to run the project, run this command in terminal to download PySimpleGui:
-```bash
-pip install PySimpleGUI
-```
+Don't pip install PySimpleGui as it requires going through getting a license for you to run the application. The project includes an older version of PyAutoGui in the project directory.
+
 As long as python is installed correctly, all that's left is to doubleclick main.py
 ### How it works
 There are different tabs with their own tables in the database. Staff, students and events must be added into their table in order to assign people to an event. Buttons work exactly as labelled. All tables are stored in database.db and all code is in main.py
